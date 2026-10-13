@@ -157,7 +157,8 @@ Measured after the change (BTC, 2026-10-12, live, the books as valued for the ma
 | Deribit | 20 bands of $10 a side | 638 / 615 levels, out to the 50 % limit (82 changes in 30 s, no gap) |
 | Aster | the top 20 levels | REST depth: 1 000 levels a side, 265 / 183 bp, answered in 0.45 s (the server's merge is covered by tests, not measured live) |
 | Bitfinex, HTX | as in the table above | the deeper WebSocket book (`len` 250, `step0`); not re-measured in the app |
-| Kraken | depth 100 | depth 100 again (see below) |
+| Kraken | depth 100 (122 levels, 11 bp) | depth 1 000 again, from 2026-10-13: 1 000 / 1 000 levels, 424 / 318 bp, no checksum failure in 11 835 live updates (see below) |
+| Crypto.com | 10 levels, 1.3 / 1.1 bp | 50 levels (its deepest), 6.5 / 6.2 bp, from 2026-10-13; 8.6 messages a second as before, 9.1 KB a second instead of 5.0 |
 
 Kraken at depth 1 000 was taken back the same evening. Kraken sends about 250 book messages a second (194 at depth 100, 249 at 1 000,
 measured 2026-10-12), and its depth session sorted the whole book three times and parsed every kept level's decimal text again on each:
@@ -165,6 +166,22 @@ measured 2026-10-12), and its depth session sorted the whole book three times an
 Kraken session), and a server from that commit with the deep venues on did not answer at all; with the fix below, about 20 ms at a quarter
 of a core. The session now sorts once per side (116 µs an update at depth 100, 605 µs at 1 000) and Kraken subscribes at depth 100. A
 deeper Kraken book needs the book built for the map less often than every message first.
+
+Done the next day (2026-10-13), and Kraken is at depth 1 000 again. Two costs were left at 1 000 levels: the session (605 µs an update,
+still copying and sorting the whole book) and the book handed on with every update (394 µs in the server's state alone, measured with
+`createLocalServer().applyMessage`; 140 µs at depth 100). Now:
+
+- The Kraken and Bitfinex sessions keep each side as one array best first and change it in place: an update's levels are found by binary
+  search, Kraken's side is cut to the depth, and the checksum reads the first ten (Kraken) or 25 (Bitfinex) levels. 38 µs an update at
+  depth 1 000 in the benchmark (`.tmp/kraken-bench.mts`), 44 µs on the live feed.
+- The whole book is built and handed on at most every 250 ms (`WHOLE_BOOK_EVERY_MS` in `live-feeds.mts`). Every update is still taken and
+  checked when it comes; one inside the interval waits for the next update after it, or for a timer when none comes, so a quiet market
+  does not leave the book behind.
+
+Live, 60 s of Kraken BTC/USD at depth 1 000 through the app's parser, normalizer and session (`.tmp/kraken-live.mts`): 11 835 updates
+(197 a second), all accepted, no checksum failure, 1 000 levels a side reaching 424 / 318 bp, 3.3 books a second handed on; 79 µs an
+update to parse and normalize (as before) and 44 µs in the session. Bitfinex's session had the same per-update copy and sort at `len` 250
+(about 170 updates a second) and was changed the same way.
 
 What it costs: a page with both OKX books open reads 223 KB (perpetual) and 280 KB (spot) of JSON every 15 s, about 120 MB an hour to
 parse, which arrive gzipped as 55 KB and 75 KB (about 31 MB an hour on the wire; measured 2026-10-12), and nothing while the tab is hidden.
