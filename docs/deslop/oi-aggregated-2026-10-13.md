@@ -39,3 +39,19 @@ venues up: one venue's buyers say nothing about who opened positions on another.
 - Hourly OKX history before its two days of five-minute bars is read by the server only.
 - A venue switched off in the Venues chips is left out of the sum from then on, back through its whole history: the sum is of the
   venues on now, not of those that were on then.
+
+## NL/NS read per market (second pass, same day)
+
+Three flaws in the first NL/NS over venues, found reviewing it before building on it:
+
+- **Deribit's inverse perpetual.** Its open interest is a count of USD contracts, read as coins at each reading's mark. A 2 % move of the
+  price with no contract opened or closed read as 2 % of its open interest opened or closed, and NL/NS gave that to the takers. The hub now
+  puts an inverse market's bars in coins at one price, the newest close on screen (`atOnePrice`), before the sum, the pane or NL/NS see them.
+- **Sparse readings.** A venue read every five minutes, or hourly in older history, changes once, by the whole step, in the candle of its
+  new reading. That step was given to the takers of that one candle. It is now given to the takers of every candle since the reading before
+  (`nlnsModel` sums the market's delta over them), and the candle is marked coarse when that stretch is longer than a candle.
+- **Mixed candles.** Each venue was turned into one signed number before the venues were added, so new longs on one venue and new shorts on
+  another summed to 0 and read "no change". Each market is now classified into the four parts first; a candle whose parts pull both ways
+  reads "Both ways" and the popup lists them, with the longs' and shorts' own sums beside the net.
+
+Recorded flow that came out even (takers even) is no longer handed to the price's way: only flow that was not recorded is.
