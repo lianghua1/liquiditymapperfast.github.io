@@ -55,3 +55,15 @@ Three flaws in the first NL/NS over venues, found reviewing it before building o
   reads "Both ways" and the popup lists them, with the longs' and shorts' own sums beside the net.
 
 Recorded flow that came out even (takers even) is no longer handed to the price's way: only flow that was not recorded is.
+
+## Review fixes (sol-max, same day)
+
+- Deribit's one-price conversion first rebuilt USD from each candle's close, which is off by what the price moved between the reading and
+  the close (a reading sampled at $50K under an open candle at $55K read as 1.8 BTC opened). Its readings now keep their own USD (the
+  history store's quote columns, already there) and the hub divides that by one price; the rebuild stays only for readings without USD.
+- On 4-hour and daily charts the bars are a candle apart, longer than the two-hour hold, and NL/NS counted none of their changes: bars a
+  candle apart are consecutive readings.
+- A reading whose stretch began before the view was given only to the takers in view (panning could turn new shorts into new longs): the
+  pane works out one hold of candles before the view as well, in a run of their own.
+- Bybit and OKX history that answered an error (HTTP 200 with an error code) read as an empty history, which the sampler took as done:
+  such an answer now fails, and the sampler tries again later.
