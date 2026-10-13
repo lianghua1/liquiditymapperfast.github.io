@@ -166,8 +166,22 @@ Kraken session), and a server from that commit with the deep venues on did not a
 of a core. The session now sorts once per side (116 µs an update at depth 100, 605 µs at 1 000) and Kraken subscribes at depth 100. A
 deeper Kraken book needs the book built for the map less often than every message first.
 
-What it costs: a page with an OKX book open reads about 220 KB every 15 s for each (perpetual and spot), about 50 MB an hour for both, and
-nothing while the tab is hidden. Deeper books also mean more levels in each recorded minute; the recorder's floor (bins under $10K are not
+What it costs: a page with both OKX books open reads 223 KB (perpetual) and 280 KB (spot) of JSON every 15 s, about 120 MB an hour to
+parse, which arrive gzipped as 55 KB and 75 KB (about 31 MB an hour on the wire; measured 2026-10-12), and nothing while the tab is hidden.
+
+The WebSocket books before and after, side by side for the same 60 s (BTC, 2026-10-12 late evening UTC-3; JSON as parsed, HTX after gunzip):
+
+| Feed | Snapshot | Messages a second | KB a second | Level rows a second |
+| --- | --- | ---: | ---: | ---: |
+| Deribit, $10 bands, 20 a side | 40 rows, 0.9 KB | 3.0 | 2.8 | 120 (every message the whole 40) |
+| Deribit, whole book | 2 060 rows, 45 KB | 3.0 | 3.3 | 110 (changes only) |
+| Bitfinex `len` 25 | 50 rows | 47 | 1.2 | 47 |
+| Bitfinex `len` 250 | 500 rows | 169 | 4.3 | 169 |
+| HTX `step6` | 60 rows | 9.9 | 9.6 | 600 (every message the whole book) |
+| HTX `step0` | 300 rows | 9.9 | 40.7 | 3 000 (every message the whole book) |
+| Kraken depth 100 (unchanged, for scale) | 200 rows | 110 | 20.7 | 144 |
+
+Aster's REST depth 1 000 (server only) is 39 KB every 15 s, 8 KB gzipped. Deeper books also mean more levels in each recorded minute; the recorder's floor (bins under $10K are not
 kept once a column has 300) bounds that, but the page's IndexedDB recording will grow somewhat. The recorded map changes texture from this
 change on: Deribit BTC in single levels instead of $10 bands, OKX and Aster with walls far from the price they did not have before.
 
