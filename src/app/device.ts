@@ -36,6 +36,11 @@ export const isPhoneLayout = (mode: LayoutMode): boolean => mode !== 'desktop';
 type Listener = (mode: LayoutMode, previous: LayoutMode) => void;
 const listeners = new Set<Listener>();
 let current: LayoutMode = 'desktop', compact = false;
+/** An arrangement an embedding page has fixed (`?solo=orderbook` wants the desktop one however narrow its column is). */
+let forced: LayoutMode | null = null;
+
+/** Fix the panes' arrangement whatever the window measures; `null` gives the decision back to it. Call before `startDevice()`. */
+export function forceLayoutMode(mode: LayoutMode | null): void { forced = mode; }
 
 /** The panes' arrangement now (`desktop` until `startDevice()` has run, which is also what a test environment without a window gets). */
 export const layoutMode = (): LayoutMode => current;
@@ -53,7 +58,7 @@ function heldSideways(): boolean {
 }
 
 function measure(): { mode: LayoutMode; compact: boolean } {
-  const coarse = isCoarse(), mode = layoutFor(innerWidth, innerHeight, coarse, heldSideways());
+  const coarse = isCoarse(), mode = forced ?? layoutFor(innerWidth, innerHeight, coarse, heldSideways());
   return { mode, compact: compactBarFor(mode, coarse) };
 }
 

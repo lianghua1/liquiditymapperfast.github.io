@@ -1,7 +1,7 @@
 import { Hub } from './hub.ts';
 import { ServerSource } from './server-source.ts';
 import { BrowserSource } from './browser-source.ts';
-import { chooseCoin, currentCoin, forCoin, keepCoinRecordings, type CoinChoice } from './coin.ts';
+import { chooseCoin, currentCoin, forCoin, keepCoinRecordings, loadCatalogue, switchCoin, type CoinChoice } from './coin.ts';
 import { withAnchor } from './vwap/settings.ts';
 import type { DataSource } from './source.ts';
 import { loadKernels } from './kernels.ts';
@@ -29,7 +29,7 @@ import { enabledStats } from './panes/bar-stats.ts';
 import { Layout } from './layout.ts';
 import { Dock } from './dock.ts';
 import { RangeTool } from './range/tool.ts';
-import { startDevice, onLayoutMode } from './device.ts';
+import { startDevice, onLayoutMode, forceLayoutMode } from './device.ts';
 import './styles.css';
 import './mobile.css';
 import './chrome.css';
@@ -58,11 +58,28 @@ async function chooseSource(params: URLSearchParams, choice: CoinChoice): Promis
 
 async function main(): Promise<void> {
   const app = document.getElementById('app')!;
-  startDevice();
   const params = new URLSearchParams(location.search);
+  // Solo (`?solo=orderbook`): the order book pane alone, for a page that embeds it in a column of its own. The column is narrow, so the
+  // desktop arrangement is forced (a phone layout would hide the book behind tabs), and the embedding page may name the coin (below).
+  const solo = params.get('solo') === 'orderbook';
+  if (solo) { document.documentElement.dataset.solo = 'orderbook'; forceLayoutMode('desktop'); }
+  startDevice();
   // The coin first: everything after it is built for that coin (BTC needs no list, so a BTC page does not wait for one).
   const choice = await chooseCoin(params);
-  const store = new Store(forCoin(initialState(), choice.coin, choice.from));
+  // The page this book sits in says which coin it wants (`{ type: 'lmf:coin', coin: 'ETH' }` from the parent frame); a switch reloads
+  // the page with `?coin=`, as it always does. Only the parent frame may ask, and only for a coin on the list.
+  if (solo) window.addEventListener('message', event => {
+    if (event.source !== window.parent) return;
+    const asked = event.data as { type?: unknown; coin?: unknown } | null;
+    if (!asked || asked.type !== 'lmf:coin' || typeof asked.coin !== 'string') return;
+    const wanted = asked.coin.trim().toUpperCase();
+    if (!/^[A-Z0-9]{1,15}$/.test(wanted)) return;
+    void loadCatalogue().then(catalogue => { if (catalogue.coins.some(c => c.coin === wanted)) switchCoin(wanted); });
+  });
+  // The book is the point in solo: a layout saved with it closed would show nothing, so it is forced open for the embed.
+  const initial = initialState();
+  if (solo) initial.show = { ...initial.show, book: true };
+  const store = new Store(forCoin(initial, choice.coin, choice.from));
   useMarkets(() => store.state.markets);
   setTimeZone(store.state.timeZone);
   applyTheme(store.state.theme);

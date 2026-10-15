@@ -475,3 +475,14 @@ button.open { border-color: var(--ui); box-shadow: 0 0 0 1px var(--ui) inset; }
 .replay-bar .replay-play { width: 24px; height: 22px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
 .replay-bar .replay-play::before { content: ""; width: 12px; height: 12px; background: currentColor; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 4h4v16H6zM14 4h4v16h-4z'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 4h4v16H6zM14 4h4v16h-4z'/%3E%3C/svg%3E") center / contain no-repeat; }
 .replay-bar .replay-play.paused::before { -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M7 4l13 8-13 8z'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M7 4l13 8-13 8z'/%3E%3C/svg%3E") center / contain no-repeat; }
+
+/* Solo (`?solo=orderbook`, a page embedding the book in a column of its own): the order book pane alone, filling the window. Everything
+   else is still built and kept live, it is simply not laid out; the splitter tracks and widths set by the layout class are overridden. */
+html[data-solo="orderbook"] .toolbar,
+html[data-solo="orderbook"] .dock,
+html[data-solo="orderbook"] .statusbar,
+html[data-solo="orderbook"] .flow-col,
+html[data-solo="orderbook"] .chart-col,
+html[data-solo="orderbook"] main > .splitter { display: none; }
+html[data-solo="orderbook"] #app { grid-template-rows: minmax(0, 1fr); }
+html[data-solo="orderbook"] main { grid-template-columns: minmax(0, 1fr) !important; }
