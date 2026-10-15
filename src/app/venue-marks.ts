@@ -1,13 +1,40 @@
 import { venueLabel } from './venues.ts';
 
 /**
- * A small mark for each exchange, drawn here: a square in the exchange's brand colour with a monogram in its ink colour, and a notch in the
- * corner for a spot market. The page draws its own marks (no logo files): the colours say which exchange it is at a glance, the letters
- * settle it, and an exchange missing from the table still gets a plain one from its name.
+ * A small mark for each exchange: the exchange's own logo where one ships in `public/logos/` (drawn whole into the square,
+ * which carries its own colours), else a square in the exchange's brand colour with a monogram in its ink colour, and a
+ * notch in the corner for a spot market. A logo that has not loaded yet (or an exchange without one) keeps the drawn
+ * monogram: the colours say which exchange it is at a glance, the letters settle it, and an exchange missing from the
+ * table still gets a plain one from its name.
  *
  * The same mark is painted on canvases (`drawVenueMark`, cached as a bitmap per size) and set in the page (`venueMark`).
  */
 export interface MarkStyle { bg: string; fg: string; text: string }
+
+/** The logo file of each exchange that ships one, relative to the page (`public/logos/`, copied as-is into the build). An exchange missing here keeps its drawn mark. */
+const LOGO_FILES: Readonly<Record<string, string>> = {
+  binance: 'logos/binance.svg',
+  bitget: 'logos/bitget.png',
+  bybit: 'logos/bybit.png',
+  coinbase: 'logos/coinbase.png',
+  deribit: 'logos/deribit.png',
+  hyperliquid: 'logos/hyperliquid.png',
+  okx: 'logos/okx.svg',
+};
+
+const logos = new Map<string, { img: HTMLImageElement; ready: boolean }>();
+/** The loaded logo of `family`, or null while it loads or when the exchange ships none (the mark then stays its monogram). */
+function logoOf(family: string): HTMLImageElement | null {
+  const src = LOGO_FILES[family]; if (!src) return null;
+  let rec = logos.get(family);
+  if (!rec) {
+    const img = new Image(), created = { img, ready: false };
+    img.onload = () => { created.ready = true; bitmaps.clear(); };
+    img.src = src;
+    rec = created; logos.set(family, rec);
+  }
+  return rec.ready ? rec.img : null;
+}
 
 export const VENUE_MARKS: Readonly<Record<string, MarkStyle>> = {
   aster: { bg: '#f2c69b', fg: '#24160a', text: 'AS' },
@@ -85,14 +112,21 @@ function bitmap(id: string, px: number): HTMLCanvasElement {
   let canvas = bitmaps.get(key);
   if (canvas) return canvas;
   canvas = document.createElement('canvas'); canvas.width = canvas.height = px;
-  const ctx = canvas.getContext('2d')!, r = Math.max(1, px * 0.16);
-  ctx.fillStyle = m.bg; ctx.beginPath(); ctx.roundRect(0, 0, px, px, r); ctx.fill();
+  const ctx = canvas.getContext('2d')!, r = Math.max(1, px * 0.16), logo = logoOf(m.family);
+  if (logo) {
+    // The exchange's own icon, drawn whole into the square behind a rounded clip; its colours come from the file.
+    ctx.save(); ctx.beginPath(); ctx.roundRect(0, 0, px, px, r); ctx.clip();
+    ctx.drawImage(logo, 0, 0, px, px);
+    ctx.restore();
+  } else {
+    ctx.fillStyle = m.bg; ctx.beginPath(); ctx.roundRect(0, 0, px, px, r); ctx.fill();
+    ctx.fillStyle = m.fg; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = `700 ${monogramPx(px, m.text)}px ${FONT}`;
+    ctx.fillText(m.text, px / 2, px / 2 + px * 0.04);
+  }
   // A light square on a light page, or a dark one on a dark page, keeps its edge with a hairline in its own ink.
   ctx.strokeStyle = m.fg; ctx.globalAlpha = 0.28; ctx.lineWidth = Math.max(1, px / 16); ctx.beginPath(); ctx.roundRect(ctx.lineWidth / 2, ctx.lineWidth / 2, px - ctx.lineWidth, px - ctx.lineWidth, r); ctx.stroke(); ctx.globalAlpha = 1;
-  ctx.fillStyle = m.fg; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.font = `700 ${monogramPx(px, m.text)}px ${FONT}`;
-  ctx.fillText(m.text, px / 2, px / 2 + px * 0.04);
-  if (m.spot) { const s = px * 0.32; ctx.beginPath(); ctx.moveTo(px, px - s); ctx.lineTo(px, px); ctx.lineTo(px - s, px); ctx.closePath(); ctx.fill(); }
+  if (m.spot) { const s = px * 0.32; ctx.fillStyle = m.fg; ctx.beginPath(); ctx.moveTo(px, px - s); ctx.lineTo(px, px); ctx.lineTo(px - s, px); ctx.closePath(); ctx.fill(); }
   if (bitmaps.size > 400) bitmaps.clear();
   bitmaps.set(key, canvas);
   return canvas;
@@ -105,14 +139,16 @@ export function drawVenueMark(ctx: CanvasRenderingContext2D, id: string, cx: num
 }
 
 /**
- * The mark of `id` as an element of the page, `size` px a side. It reads as decoration (the name beside it says the same), so its monogram is
- * drawn by the stylesheet from `data-mark` and adds no text to the button or the row it sits in.
+ * The mark of `id` as an element of the page, `size` px a side: the exchange's logo as the square's background where it ships one, else the
+ * drawn mark. It reads as decoration (the name beside it says the same), so its monogram is drawn by the stylesheet from `data-mark` and
+ * adds no text to the button or the row it sits in.
  */
 export function venueMark(id: string, size = 14): HTMLElement {
   const m = markOf(id), el = document.createElement('i');
   el.className = `venue-mark${m.spot ? ' spot' : ''}`;
   el.setAttribute('aria-hidden', 'true');
-  el.dataset.mark = m.text;
+  const logo = LOGO_FILES[m.family];
+  if (logo) { el.classList.add('logo'); el.dataset.mark = ''; el.style.setProperty('--mark-logo', `url("${logo}")`); } else el.dataset.mark = m.text;
   el.style.setProperty('--mark-bg', m.bg); el.style.setProperty('--mark-fg', m.fg);
   el.style.width = el.style.height = `${size}px`; el.style.fontSize = `${monogramPx(size, m.text)}px`;
   return el;
